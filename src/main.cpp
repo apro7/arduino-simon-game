@@ -174,6 +174,21 @@ void playLevelUpSound() {
   tone(SPEAKER_PIN, NOTE_G5);
   delay(150);
   noTone(SPEAKER_PIN);
+  // tone(SPEAKER_PIN, NOTE_E4);
+  // delay(150);
+  // tone(SPEAKER_PIN, NOTE_D4);
+  // delay(150);
+  // tone(SPEAKER_PIN, NOTE_C4);
+  // delay(150);
+  // tone(SPEAKER_PIN, NOTE_D4);
+  // delay(150);
+  // tone(SPEAKER_PIN, NOTE_E4);
+  // delay(150);
+  // tone(SPEAKER_PIN, NOTE_E4);
+  // delay(150);
+  // tone(SPEAKER_PIN, NOTE_C4);
+  // delay(150);
+  // noTone(SPEAKER_PIN);
 }
 
 /**
