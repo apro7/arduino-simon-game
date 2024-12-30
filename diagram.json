@@ -11,6 +11,13 @@
       "left": 124,
       "attrs": { "volume": "0.1" }
     },
+    {
+      "type": "wokwi-7segment",
+      "id": "sevseg3",
+      "top": -91.51887604364414,
+      "left": 350,
+      "attrs": { "digits": "4" }
+    },
     { "type": "wokwi-led", "id": "led-red", "top": 10, "left": 6, "attrs": { "color": "red" } },
     {
       "type": "wokwi-led",
