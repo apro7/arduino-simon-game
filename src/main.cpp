@@ -37,6 +37,32 @@ const int gameTones[] = { NOTE_G3, NOTE_C4, NOTE_E4, NOTE_G5};
 uint8_t gameSequence[MAX_GAME_LENGTH] = {0};
 uint8_t gameIndex = 0;
 
+// unsigned long previousMillis = 0;
+// const long interval = 300; // interval at which to perform actions (milliseconds)
+// int toneState = 0;
+// int pitch = -10;
+// int pitchDirection = 1;
+
+enum GameState {
+  GAME_START,
+  NEW_LEVEL, // New state for adding to sequence
+  PLAYING_SEQUENCE,
+  WAITING_FOR_INPUT,
+  // CHECKING_INPUT,
+  GAME_OVER,
+  LEVEL_UP
+};
+GameState gameState = GAME_START;
+
+unsigned long timer = 0;
+int sequenceIndex = 0;
+int inputIndex = 0;
+byte currentButton;
+const unsigned long SEQUENCE_DELAY = 350;
+const unsigned long LEVEL_UP_DELAY = 150;
+const unsigned long BUTTON_DEBOUNCE_DELAY = 50;
+unsigned long lastButtonPressTime = 0;
+
 /**
    Set up the Arduino board and initialize Serial communication
 */
@@ -93,22 +119,40 @@ void displayScore() {
 /**
    Lights the given LED and plays a suitable tone
 */
-void lightLedAndPlayTone(byte ledIndex) {
-  digitalWrite(ledPins[ledIndex], HIGH);
-  tone(SPEAKER_PIN, gameTones[ledIndex]);
-  delay(300);
-  digitalWrite(ledPins[ledIndex], LOW);
-  noTone(SPEAKER_PIN);
+void lightLedAndPlayTone(byte ledIndex, bool on) {
+  // digitalWrite(ledPins[ledIndex], HIGH);
+  // tone(SPEAKER_PIN, gameTones[ledIndex]);
+  // delay(300);
+  // digitalWrite(ledPins[ledIndex], LOW);
+  // noTone(SPEAKER_PIN);
+  digitalWrite(ledPins[ledIndex], on ? HIGH : LOW);
+  if (on) {
+    tone(SPEAKER_PIN, gameTones[ledIndex]);
+  } else {
+    noTone(SPEAKER_PIN);
+  }
 }
 
 /**
    Plays the current sequence of notes that the user has to repeat
 */
 void playSequence() {
-  for (int i = 0; i < gameIndex; i++) {
-    byte currentLed = gameSequence[i];
-    lightLedAndPlayTone(currentLed);
-    delay(50);
+  // for (int i = 0; i < gameIndex; i++) {
+  //   byte currentLed = gameSequence[i];
+  //   lightLedAndPlayTone(currentLed);
+  //   delay(50);
+  // }
+  if (millis() - timer >= SEQUENCE_DELAY) { // Combined light and pause into one timed event
+    timer = millis();
+    if (sequenceIndex < gameIndex) {
+      lightLedAndPlayTone(gameSequence[sequenceIndex], sequenceIndex % 2 == 0); // Toggle light and tone
+      if(sequenceIndex % 2 != 0) sequenceIndex++;
+      else
+        sequenceIndex++;
+    } else {
+      gameState = WAITING_FOR_INPUT;
+      sequenceIndex = 0; // Reset for next time
+    }
   }
 }
 
@@ -117,15 +161,22 @@ void playSequence() {
     and returns the index of that button
 */
 byte readButtons() {
-  while (true) {
-    for (byte i = 0; i < 4; i++) {
-      byte buttonPin = buttonPins[i];
-      if (digitalRead(buttonPin) == LOW) {
-        return i;
-      }
+  // while (true) {
+  //   for (byte i = 0; i < 4; i++) {
+  //     byte buttonPin = buttonPins[i];
+  //     if (digitalRead(buttonPin) == LOW) {
+  //       return i;
+  //     }
+  //   }
+  //   delay(1);
+  // }
+  for (byte i = 0; i < 4; i++) {
+    if (digitalRead(buttonPins[i]) == LOW && millis() - lastButtonPressTime > BUTTON_DEBOUNCE_DELAY) {
+      lastButtonPressTime = millis();
+      return i;
     }
-    delay(1);
   }
+  return 255; // No button pressed
 }
 
 /**
@@ -135,60 +186,90 @@ void gameOver() {
   Serial.print("Game over! your score: ");
   Serial.println(gameIndex - 1);
   gameIndex = 0;
-  delay(200);
+  // delay(200);
+  gameState = GAME_START;
+  timer = millis();
 
   // Play a Wah-Wah-Wah-Wah sound
   tone(SPEAKER_PIN, NOTE_DS5);
-  delay(300);
+  delay(150);
   tone(SPEAKER_PIN, NOTE_D5);
-  delay(300);
+  delay(150);
   tone(SPEAKER_PIN, NOTE_CS5);
-  delay(300);
-  for (byte i = 0; i < 10; i++) {
-    for (int pitch = -10; pitch <= 10; pitch++) {
-      tone(SPEAKER_PIN, NOTE_C5 + pitch);
-      delay(5);
-    }
-  }
+  delay(150);
+  // for (byte i = 0; i < 10; i++) {
+  //   for (int pitch = -10; pitch <= 10; pitch++) {
+  //     tone(SPEAKER_PIN, NOTE_C5 + pitch);
+  //     delay(5);
+  //   }
+  // }
   noTone(SPEAKER_PIN);
 
   sendScore(DASH, DASH);
-  delay(500);
+  // delay(500);
 }
 
 /**
    Get the user's input and compare it with the expected sequence.
 */
 bool checkUserSequence() {
-  for (int i = 0; i < gameIndex; i++) {
-    byte expectedButton = gameSequence[i];
-    byte actualButton = readButtons();
-    lightLedAndPlayTone(actualButton);
-    if (expectedButton != actualButton) {
-      return false;
+  // for (int i = 0; i < gameIndex; i++) {
+  //   byte expectedButton = gameSequence[i];
+  //   byte actualButton = readButtons();
+  //   lightLedAndPlayTone(actualButton);
+  //   if (expectedButton != actualButton) {
+  //     return false;
+  //   }
+  // }
+  if (inputIndex < gameIndex) {
+    currentButton = readButtons();
+    if (currentButton != 255) {
+      lightLedAndPlayTone(currentButton, true);
+      delay(150);
+      lightLedAndPlayTone(currentButton, false);
+      if (currentButton == gameSequence[inputIndex]) { // Correct comparison
+        inputIndex++;
+      } else {
+        return false; // Incorrect button pressed
+      }
     }
+  } else {
+    inputIndex = 0; // Reset for next sequence
+    return true; // Full sequence entered correctly
   }
-
-  return true;
+  return true; // Still waiting for input
 }
 
 /**
    Plays a hooray sound whenever the user finishes a level
 */
 void playLevelUpSound() {
-  tone(SPEAKER_PIN, NOTE_E4);
-  delay(150);
-  tone(SPEAKER_PIN, NOTE_G4);
-  delay(150);
-  tone(SPEAKER_PIN, NOTE_E5);
-  delay(150);
-  tone(SPEAKER_PIN, NOTE_C5);
-  delay(150);
-  tone(SPEAKER_PIN, NOTE_D5);
-  delay(150);
-  tone(SPEAKER_PIN, NOTE_G5);
-  delay(150);
-  noTone(SPEAKER_PIN);  
+  // tone(SPEAKER_PIN, NOTE_E4);
+  // delay(150);
+  // tone(SPEAKER_PIN, NOTE_G4);
+  // delay(150);
+  // tone(SPEAKER_PIN, NOTE_E5);
+  // delay(150);
+  // tone(SPEAKER_PIN, NOTE_C5);
+  // delay(150);
+  // tone(SPEAKER_PIN, NOTE_D5);
+  // delay(150);
+  // tone(SPEAKER_PIN, NOTE_G5);
+  // delay(150);
+  // noTone(SPEAKER_PIN);  
+  if (millis() - timer >= LEVEL_UP_DELAY) {
+        timer = millis();
+        switch(sequenceIndex) {
+            case 0: tone(SPEAKER_PIN, NOTE_E4); break;
+            case 1: tone(SPEAKER_PIN, NOTE_G4); break;
+            case 2: tone(SPEAKER_PIN, NOTE_E5); break;
+            case 3: tone(SPEAKER_PIN, NOTE_C5); break;
+            case 4: tone(SPEAKER_PIN, NOTE_D5); break;
+            case 5: tone(SPEAKER_PIN, NOTE_G5); break;
+            default: noTone(SPEAKER_PIN); gameState = PLAYING_SEQUENCE; sequenceIndex = 0; return;
+        }
+        sequenceIndex++;
+  }
 }
 
 /**
@@ -197,22 +278,76 @@ void playLevelUpSound() {
 void loop() {
   displayScore();
 
-  // Add a random color to the end of the sequence
-  gameSequence[gameIndex] = random(0, 4);
-  gameIndex++;
-  if (gameIndex >= MAX_GAME_LENGTH) {
-    gameIndex = MAX_GAME_LENGTH - 1;
-  }
+  // // Add a random color to the end of the sequence
+  // gameSequence[gameIndex] = random(0, 4);
+  // gameIndex++;
+  // if (gameIndex >= MAX_GAME_LENGTH) {
+  //   gameIndex = MAX_GAME_LENGTH - 1;
+  // }
 
-  playSequence();
-  if (!checkUserSequence()) {
-    gameOver();
-  }
+  // playSequence();
+  // if (!checkUserSequence()) {
+  //   gameOver();
+  // }
 
-  delay(300);
+  // delay(300);
 
-  if (gameIndex > 0) {
-    playLevelUpSound();
-    delay(300);
+  // if (gameIndex > 0) {
+  //   playLevelUpSound();
+  //   delay(300);
+  // }
+
+  switch (gameState) {
+    case GAME_START:
+      // gameSequence[gameIndex] = random(0, 4);
+      // gameIndex++;
+      // if (gameIndex >= MAX_GAME_LENGTH) {
+      //   gameIndex = MAX_GAME_LENGTH - 1;
+      // }
+      // gameState = PLAYING_SEQUENCE;
+      // timer = millis(); // Initialize timer
+      // sequenceIndex = 0;
+      // break;
+      gameIndex = 0; // Reset game index at the start of a new game
+      gameState = NEW_LEVEL;
+      break;
+    case NEW_LEVEL: // Add to sequence here
+      if (gameIndex < MAX_GAME_LENGTH) {
+        gameSequence[gameIndex] = random(0, 4);
+        gameIndex++;
+      } else {
+        // Handle maximum game length reached (optional)
+        gameState = GAME_OVER; //Or some other appropriate action
+        break;
+      }
+      gameState = PLAYING_SEQUENCE;
+      timer = millis();
+      sequenceIndex = 0;
+      break;
+
+    case PLAYING_SEQUENCE:
+      playSequence();
+      break;
+
+    case WAITING_FOR_INPUT:
+      if (!checkUserSequence()) {
+        gameState = GAME_OVER;
+      } else if (inputIndex >= gameIndex) {
+          gameState = LEVEL_UP;
+          timer = millis();
+          sequenceIndex = 0;
+      }
+      break;
+
+    case GAME_OVER:
+      gameOver();
+      break;
+      
+    case LEVEL_UP:
+        playLevelUpSound();
+        if (sequenceIndex >= 6) { //After level up sound is complete
+          gameState = NEW_LEVEL; // Go to the next level
+        }
+        break;
   }
 }
