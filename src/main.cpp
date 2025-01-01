@@ -8,17 +8,26 @@
 
 #include <Arduino.h>
 #include <pitches.h>
+#include "SevSeg.h"
 
 /* Constants - define pin numbers for LEDs,
    buttons and speaker, and also the game tones: */
-const uint8_t ledPins[] = {9, 10, 11, 12};
-const uint8_t buttonPins[] = {2, 3, 4, 5};
+const uint8_t ledPins[] = {39, 41, 43, 45}; //yellow, blue, green, [red]
+const uint8_t buttonPins[] = {31, 33, 35, 37}; //yellow, blue, green, [red]
 #define SPEAKER_PIN 8
 
-// These are connected to 74HC595 shift register (used to show game score):
+// // These are connected to 74HC595 shift register (used to show game score):
 const int LATCH_PIN = A1;  // 74HC595 pin 12
 const int DATA_PIN = A0;  // 74HC595pin 14
 const int CLOCK_PIN = A2;  // 74HC595 pin 11
+
+// SevSeg sevseg; //Initiate a seven segment controller object
+// byte numDigits = 4;  
+// byte digitPins[] = {2, 3, 4, 5};
+// byte segmentPins[] = {6, 7, 30, 9, 10, 11, 12, 13}; //changed 8 to 30
+// bool resistorsOnSegments = 0; 
+// // variable above indicates that 4 resistors were placed on the digit pins.
+// // set variable to 1 if you want to use 8 resistors on the segment pins.
 
 #define MAX_GAME_LENGTH 100
 
@@ -41,6 +50,9 @@ void setup() {
   pinMode(LATCH_PIN, OUTPUT);
   pinMode(CLOCK_PIN, OUTPUT);
   pinMode(DATA_PIN, OUTPUT);
+  
+  // sevseg.begin(COMMON_CATHODE, numDigits, digitPins, segmentPins, resistorsOnSegments);
+  // sevseg.setBrightness(90);
 
   // The following line primes the random number generator.
   // It assumes pin A3 is floating (disconnected):
@@ -48,6 +60,7 @@ void setup() {
 }
 
 /* Digit table for the 7-segment display */
+// TODO - this code block may not be needed for sevseg
 const uint8_t digitTable[] = {
   0b11000000,
   0b11111001,
@@ -60,13 +73,15 @@ const uint8_t digitTable[] = {
   0b10000000,
   0b10010000,
 };
-const uint8_t DASH = 0b10111111;
+const uint8_t DASH = 0b10111111; //TODO - check if this old code is correct for sevseg
 
 void sendScore(uint8_t high, uint8_t low) {
   digitalWrite(LATCH_PIN, LOW);
   shiftOut(DATA_PIN, CLOCK_PIN, MSBFIRST, low);
   shiftOut(DATA_PIN, CLOCK_PIN, MSBFIRST, high);
   digitalWrite(LATCH_PIN, HIGH);
+
+  //TODO .. write code for sevseg display
 }
 
 void displayScore() {
@@ -173,22 +188,7 @@ void playLevelUpSound() {
   delay(150);
   tone(SPEAKER_PIN, NOTE_G5);
   delay(150);
-  noTone(SPEAKER_PIN);
-  // tone(SPEAKER_PIN, NOTE_E4);
-  // delay(150);
-  // tone(SPEAKER_PIN, NOTE_D4);
-  // delay(150);
-  // tone(SPEAKER_PIN, NOTE_C4);
-  // delay(150);
-  // tone(SPEAKER_PIN, NOTE_D4);
-  // delay(150);
-  // tone(SPEAKER_PIN, NOTE_E4);
-  // delay(150);
-  // tone(SPEAKER_PIN, NOTE_E4);
-  // delay(150);
-  // tone(SPEAKER_PIN, NOTE_C4);
-  // delay(150);
-  // noTone(SPEAKER_PIN);
+  noTone(SPEAKER_PIN);  
 }
 
 /**
