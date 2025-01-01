@@ -57,11 +57,12 @@ GameState gameState = GAME_START;
 unsigned long timer = 0;
 int sequenceIndex = 0;
 int inputIndex = 0;
-byte currentButton;
+byte currentButton = 255; // Initialize to no button pressed
 const unsigned long SEQUENCE_DELAY = 350;
 const unsigned long LEVEL_UP_DELAY = 150;
 const unsigned long BUTTON_DEBOUNCE_DELAY = 50;
 unsigned long lastButtonPressTime = 0;
+unsigned long inputTimer = 0; // Timer for input timeout
 
 /**
    Set up the Arduino board and initialize Serial communication
@@ -142,16 +143,26 @@ void playSequence() {
   //   lightLedAndPlayTone(currentLed);
   //   delay(50);
   // }
+  static bool lightOn = false; // Keep track of light state
+  static int currentLed;
+  
   if (millis() - timer >= SEQUENCE_DELAY) { // Combined light and pause into one timed event
     timer = millis();
     if (sequenceIndex < gameIndex) {
-      lightLedAndPlayTone(gameSequence[sequenceIndex], sequenceIndex % 2 == 0); // Toggle light and tone
-      if(sequenceIndex % 2 != 0) sequenceIndex++;
-      else
-        sequenceIndex++;
+        if (!lightOn) {
+            currentLed = gameSequence[sequenceIndex];
+            lightLedAndPlayTone(currentLed, true); // Turn on light and tone
+            lightOn = true;
+        } else {
+            lightLedAndPlayTone(currentLed, false); // Turn off light and tone
+            lightOn = false;
+            sequenceIndex++;
+        }
     } else {
-      gameState = WAITING_FOR_INPUT;
-      sequenceIndex = 0; // Reset for next time
+        lightOn = false; // Ensure light and tone are off after sequence
+        noTone(SPEAKER_PIN);
+        gameState = WAITING_FOR_INPUT;
+        sequenceIndex = 0;
     }
   }
 }
@@ -170,13 +181,15 @@ byte readButtons() {
   //   }
   //   delay(1);
   // }
-  for (byte i = 0; i < 4; i++) {
-    if (digitalRead(buttonPins[i]) == LOW && millis() - lastButtonPressTime > BUTTON_DEBOUNCE_DELAY) {
-      lastButtonPressTime = millis();
-      return i;
+  if (millis() - lastButtonPressTime > BUTTON_DEBOUNCE_DELAY) {
+        for (byte i = 0; i < 4; i++) {
+            if (digitalRead(buttonPins[i]) == LOW) {
+                lastButtonPressTime = millis();
+                return i;
+            }
+        }
     }
-  }
-  return 255; // No button pressed
+  return 255;
 }
 
 /**
@@ -222,22 +235,27 @@ bool checkUserSequence() {
   //   }
   // }
   if (inputIndex < gameIndex) {
-    currentButton = readButtons();
-    if (currentButton != 255) {
-      lightLedAndPlayTone(currentButton, true);
-      delay(150);
-      lightLedAndPlayTone(currentButton, false);
-      if (currentButton == gameSequence[inputIndex]) { // Correct comparison
-        inputIndex++;
-      } else {
-        return false; // Incorrect button pressed
-      }
+        if (millis() - inputTimer >= 3000) { // 3 second timeout
+            return false;
+        }
+        currentButton = readButtons();
+        if (currentButton != 255) {
+            inputTimer = millis();
+            lightLedAndPlayTone(currentButton, true);
+            delay(150);
+            lightLedAndPlayTone(currentButton, false);
+            if (currentButton == gameSequence[inputIndex]) {
+                inputIndex++;
+                currentButton = 255;
+            } else {
+                return false;
+            }
+        }
+      return true; // Still waiting for more input!!!  
+    } else {
+        inputIndex = 0;
+        return true;
     }
-  } else {
-    inputIndex = 0; // Reset for next sequence
-    return true; // Full sequence entered correctly
-  }
-  return true; // Still waiting for input
 }
 
 /**
@@ -330,8 +348,20 @@ void loop() {
       break;
 
     case WAITING_FOR_INPUT:
+      // inputTimer = millis();
+      // if (!checkUserSequence()) {
+      //   gameState = GAME_OVER;
+      // } else if (inputIndex >= gameIndex) {
+      //   gameState = LEVEL_UP;
+      //   timer = millis();
+      //   sequenceIndex = 0;
+      // }
+      // break;
+      if (inputIndex == 0) { // Only reset timer at the beginning of input
+        inputTimer = millis();
+      }
       if (!checkUserSequence()) {
-        gameState = GAME_OVER;
+          gameState = GAME_OVER;
       } else if (inputIndex >= gameIndex) {
           gameState = LEVEL_UP;
           timer = millis();
