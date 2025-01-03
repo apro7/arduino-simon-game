@@ -45,24 +45,101 @@ uint8_t gameIndex = 0;
 
 enum GameState {
   GAME_START,
-  NEW_LEVEL, // New state for adding to sequence
+  NEW_LEVEL, 
   PLAYING_SEQUENCE,
   WAITING_FOR_INPUT,
-  // CHECKING_INPUT,
+  CHECKING_INPUT,
+  PLAYING_INPUT,
+  IS_THERE_MORE,
   GAME_OVER,
-  LEVEL_UP
+  LEVEL_UP,
+  LEVEL_UP_SEQUENCE,
 };
 GameState gameState = GAME_START;
 
-unsigned long timer = 0;
+enum LightAndToneState {
+  LIGHT_AND_TONE_OFF,
+  LIGHT_AND_TONE_ON,
+  LIGHT_AND_TONE_WAIT,
+  LIGHT_AND_TONE_DONE,
+};
+LightAndToneState lightAndToneState = LIGHT_AND_TONE_OFF;
+
+enum PlaySequenceState {
+  PLAYING_SEQUENCE_OFF,
+  PLAYING_SEQUENCE_ON,
+  PLAYING_SEQUENCE_PLAY_WAIT,
+  PLAYING_SEQUENCE_INBETWEEN_WAIT,
+  PLAYING_SEQUENCE_CHECK,
+  PLAYING_SEQUENCE_DONE,
+};
+PlaySequenceState playSequenceState = PLAYING_SEQUENCE_OFF;
+
+enum SingleButtonPlayState {
+  BUTTON_PLAYING_OFF,
+  BUTTON_PLAYING_ON,
+  BUTTON_PLAYING_PLAY_WAIT,
+  BUTTON_PLAYING_DONE,
+};
+SingleButtonPlayState singleButtonPlayState = BUTTON_PLAYING_OFF;
+
+enum ReadButtonState {
+  READ_BUTTON_OFF,
+  READ_BUTTON_ON,
+  READ_BUTTON_WAIT,
+  READ_BUTTON_DONE,
+};
+ReadButtonState readButtonState = READ_BUTTON_OFF;
+
+enum GameOverSequenceState {
+  GAME_OVER_OFF,
+  GAME_OVER_START_WAIT,
+  GAME_OVER_T1_ON,
+  GAME_OVER_T1_WAIT,
+  GAME_OVER_T2_ON,
+  GAME_OVER_T2_WAIT,
+  GAME_OVER_T3_ON,
+  GAME_OVER_T3_WAIT,
+  GAME_OVER_T4_ON,
+  GAME_OVER_T_OFF,
+  GAME_OVER_END_ON,
+  GAME_OVER_END_WAIT,
+};
+GameOverSequenceState gameOverSequenceState = GAME_OVER_OFF;
+
+//APro's Constants code
+unsigned long lightAndToneDuration = 300; // Timer duration in milliseconds for light and tone duration
+unsigned long playSequenceWaitDuration = 50; // Timer duration in milliseconds to wait between light/tone steps
+unsigned long playSequenceTimer = 0; // Timer allocated for playSequence
+unsigned long readButtonWaitDuration = 1; // Timer duration in milliseconds to wait between reads
+unsigned long readButtonTimer = 0; // Timer allocated for readButtons
+unsigned long singlePlayWaitDuration = 50; // Timer duration in milliseconds to wait between light/tone steps
+unsigned long singlePlayTimer = 0; // Timer allocated for singlePlay
+unsigned long gameOverStartWaitDuration = 200; // Timer duration in milliseconds to wait before game over sequence
+unsigned long gameOverT1Duration = 300; // Timer duration in milliseconds for gameOver tone 1
+unsigned long gameOverT2Duration = 300; // Timer duration in milliseconds for gameOver tone 2
+unsigned long gameOverT3Duration = 300; // Timer duration in milliseconds for gameOver tone 3
+unsigned long gameOverT4Duration = 900; // Timer duration in milliseconds for gameOver tone 4
+unsigned long gameOverEndWaitDuration = 200; // Timer duration in milliseconds to wait after game over sequence
+// end APro's code
+
+//APro's Variables code
+byte expectedButton = 255; // Initialize to no button pressed
+byte actualButton = 255; // Initialize to no button pressed
+byte buttonIndex = 255; // Initialize to no button pressed (internal index)
+
+unsigned long timer = 0; //Replaced with playSequenceTimer and???
 int sequenceIndex = 0;
 int inputIndex = 0;
 byte currentButton = 255; // Initialize to no button pressed
-const unsigned long SEQUENCE_DELAY = 350;
+
+int checkIndex = 0;
+// const unsigned long SEQUENCE_DELAY = 350; //Replaced with playSequenceWaitDuration
 const unsigned long LEVEL_UP_DELAY = 150;
 const unsigned long BUTTON_DEBOUNCE_DELAY = 50;
 unsigned long lastButtonPressTime = 0;
 unsigned long inputTimer = 0; // Timer for input timeout
+
 
 /**
    Set up the Arduino board and initialize Serial communication
@@ -121,57 +198,173 @@ void displayScore() {
    Lights the given LED and plays a suitable tone
 */
 void lightLedAndPlayTone(byte ledIndex, bool on) {
+  if (on) {
+    digitalWrite(ledPins[ledIndex], HIGH);
+    tone(SPEAKER_PIN, gameTones[ledIndex]);
+  } else {
+    digitalWrite(ledPins[ledIndex], LOW);
+    noTone(SPEAKER_PIN);
+  }
+  
   // digitalWrite(ledPins[ledIndex], HIGH);
   // tone(SPEAKER_PIN, gameTones[ledIndex]);
   // delay(300);
   // digitalWrite(ledPins[ledIndex], LOW);
   // noTone(SPEAKER_PIN);
-  digitalWrite(ledPins[ledIndex], on ? HIGH : LOW);
-  if (on) {
-    tone(SPEAKER_PIN, gameTones[ledIndex]);
-  } else {
-    noTone(SPEAKER_PIN);
-  }
+  
+  // digitalWrite(ledPins[ledIndex], on ? HIGH : LOW);
+  // if (on) {
+  //   tone(SPEAKER_PIN, gameTones[ledIndex]);
+  // } else {
+  //   noTone(SPEAKER_PIN);
+  // }
 }
 
 /**
    Plays the current sequence of notes that the user has to repeat
 */
 void playSequence() {
-  // for (int i = 0; i < gameIndex; i++) {
-  //   byte currentLed = gameSequence[i];
-  //   lightLedAndPlayTone(currentLed);
-  //   delay(50);
-  // }
-  static bool lightOn = false; // Keep track of light state
-  static int currentLed;
-  
-  if (millis() - timer >= SEQUENCE_DELAY) { // Combined light and pause into one timed event
-    timer = millis();
-    if (sequenceIndex < gameIndex) {
-        if (!lightOn) {
-            currentLed = gameSequence[sequenceIndex];
-            lightLedAndPlayTone(currentLed, true); // Turn on light and tone
-            lightOn = true;
-        } else {
-            lightLedAndPlayTone(currentLed, false); // Turn off light and tone
-            lightOn = false;
-            sequenceIndex++;
-        }
-    } else {
-        lightOn = false; // Ensure light and tone are off after sequence
-        noTone(SPEAKER_PIN);
-        gameState = WAITING_FOR_INPUT;
-        sequenceIndex = 0;
-    }
+  switch (playSequenceState) {
+    case PLAYING_SEQUENCE_OFF:
+      playSequenceState = PLAYING_SEQUENCE_ON;
+      Serial.println("playSequence-Off to On ");
+      playSequenceTimer = millis();
+      sequenceIndex = 0;
+      break;
+    case PLAYING_SEQUENCE_ON:
+      lightAndToneState = LIGHT_AND_TONE_ON;
+      lightLedAndPlayTone(gameSequence[sequenceIndex], true); //turn on
+      lightAndToneState = LIGHT_AND_TONE_WAIT;
+      playSequenceState = PLAYING_SEQUENCE_PLAY_WAIT;
+      break;
+    case PLAYING_SEQUENCE_PLAY_WAIT:
+      switch (lightAndToneState) {
+        case LIGHT_AND_TONE_WAIT:
+          if (millis() - playSequenceTimer >= lightAndToneDuration) {
+            playSequenceTimer = millis();
+            lightAndToneState = LIGHT_AND_TONE_DONE;
+          }
+          break;
+        case LIGHT_AND_TONE_DONE:
+          lightLedAndPlayTone(gameSequence[sequenceIndex], false); //turn off  
+          lightAndToneState = LIGHT_AND_TONE_OFF;
+          playSequenceState = PLAYING_SEQUENCE_INBETWEEN_WAIT;
+          break;
+      }
+      break; // Should never reach here
+    case PLAYING_SEQUENCE_INBETWEEN_WAIT: // Wait between lights and tones
+      if (millis() - playSequenceTimer >= playSequenceWaitDuration) {
+        playSequenceTimer = millis();
+        sequenceIndex++;
+        playSequenceState = PLAYING_SEQUENCE_CHECK;
+      }
+      break;
+    case PLAYING_SEQUENCE_CHECK:
+      if (sequenceIndex < gameIndex) {
+        playSequenceState = PLAYING_SEQUENCE_ON;
+      } else {
+        playSequenceState = PLAYING_SEQUENCE_DONE;
+      }
+      break;
+    case PLAYING_SEQUENCE_DONE:
+      playSequenceState = PLAYING_SEQUENCE_OFF;
+      gameState = WAITING_FOR_INPUT;
+      Serial.println("gameState: PLAYING_SEQUNCE to WAITING_FOR_INPUT ");
+      break;
+      
   }
+}
+
+/**
+   Plays the current note and LED based on what was just pressed
+*/
+void playCurrentNoteAndLed() {
+  switch (singleButtonPlayState) {
+    case BUTTON_PLAYING_OFF:
+      singleButtonPlayState = BUTTON_PLAYING_ON;
+      Serial.println("playCurrentNoteAndLed: BUTTON_PLAYING_OFF to BUTTON_PLAYING_ON ");
+      singlePlayTimer = millis();
+      break;
+    case BUTTON_PLAYING_ON:
+      lightAndToneState = LIGHT_AND_TONE_ON;
+      lightLedAndPlayTone(currentButton, true);
+      lightAndToneState = LIGHT_AND_TONE_WAIT;
+      singleButtonPlayState = BUTTON_PLAYING_PLAY_WAIT;
+      Serial.println("playCurrentNoteAndLed: BUTTON_PLAYING_ON to BUTTON_PLAYING_PLAY_WAIT ");
+      break;
+    case BUTTON_PLAYING_PLAY_WAIT:
+      switch (lightAndToneState) {
+        case LIGHT_AND_TONE_WAIT:
+          if (millis() - singlePlayTimer >= lightAndToneDuration) {
+            singlePlayTimer = millis();
+            lightAndToneState = LIGHT_AND_TONE_DONE;
+          }
+          break;
+        case LIGHT_AND_TONE_DONE:
+          lightLedAndPlayTone(currentButton, false);
+          lightAndToneState = LIGHT_AND_TONE_OFF;
+          singleButtonPlayState = BUTTON_PLAYING_DONE;
+          break;
+      }
+      break;
+    case BUTTON_PLAYING_DONE:
+      singleButtonPlayState = BUTTON_PLAYING_OFF;
+      gameState = IS_THERE_MORE;
+      Serial.println("gameState: PLAYING_INPUT to IS_THERE_MORE ");
+      break;
+  }
+  // lightLedAndPlayTone(currentButton, true);
+  // delay(150);
+  // lightLedAndPlayTone(currentButton, false);
 }
 
 /**
     Waits until the user pressed one of the buttons,
     and returns the index of that button
 */
-byte readButtons() {
+void readButtons() {
+  switch (readButtonState) {
+    case READ_BUTTON_OFF:
+      buttonIndex = 255;
+      actualButton = 255;
+      readButtonState = READ_BUTTON_ON;
+      readButtonTimer = millis();
+      break;
+    case READ_BUTTON_ON:
+      // if (millis() - lastButtonPressTime > BUTTON_DEBOUNCE_DELAY) {
+        for (byte i = 0; i < 4; i++) {
+          byte buttonPin = buttonPins[i];
+          if (digitalRead(buttonPin) == LOW) {
+            buttonIndex = i;
+          }
+        }
+        readButtonState = READ_BUTTON_WAIT;
+
+      // }
+      break;
+    case READ_BUTTON_WAIT:
+      if (millis() - readButtonTimer >= readButtonWaitDuration) {
+        if (buttonIndex != 255) {
+          readButtonState = READ_BUTTON_DONE;
+          actualButton = buttonIndex;
+          Serial.println("actual button is");
+          Serial.println(actualButton);
+        } else {
+          readButtonState = READ_BUTTON_ON;
+        }
+      }
+      // if (millis() - lastButtonPressTime >= BUTTON_DEBOUNCE_DELAY) {
+        // readButtonState = READ_BUTTON_DONE;
+      // }
+      break;
+    case READ_BUTTON_DONE:
+      // readButtonState = READ_BUTTON_OFF;
+      
+
+      break; 
+  }
+  
+  
   // while (true) {
   //   for (byte i = 0; i < 4; i++) {
   //     byte buttonPin = buttonPins[i];
@@ -181,15 +374,17 @@ byte readButtons() {
   //   }
   //   delay(1);
   // }
-  if (millis() - lastButtonPressTime > BUTTON_DEBOUNCE_DELAY) {
-        for (byte i = 0; i < 4; i++) {
-            if (digitalRead(buttonPins[i]) == LOW) {
-                lastButtonPressTime = millis();
-                return i;
-            }
-        }
-    }
-  return 255;
+  
+  
+  // if (millis() - lastButtonPressTime > BUTTON_DEBOUNCE_DELAY) {
+  //       for (byte i = 0; i < 4; i++) {
+  //           if (digitalRead(buttonPins[i]) == LOW) {
+  //               lastButtonPressTime = millis();
+  //               return i;
+  //           }
+  //       }
+  //   }
+  // return 255;
 }
 
 /**
@@ -238,7 +433,7 @@ bool checkUserSequence() {
         if (millis() - inputTimer >= 3000) { // 3 second timeout
             return false;
         }
-        currentButton = readButtons();
+        // currentButton = readButtons();
         if (currentButton != 255) {
             inputTimer = millis();
             lightLedAndPlayTone(currentButton, true);
@@ -262,32 +457,32 @@ bool checkUserSequence() {
    Plays a hooray sound whenever the user finishes a level
 */
 void playLevelUpSound() {
-  // tone(SPEAKER_PIN, NOTE_E4);
-  // delay(150);
-  // tone(SPEAKER_PIN, NOTE_G4);
-  // delay(150);
-  // tone(SPEAKER_PIN, NOTE_E5);
-  // delay(150);
-  // tone(SPEAKER_PIN, NOTE_C5);
-  // delay(150);
-  // tone(SPEAKER_PIN, NOTE_D5);
-  // delay(150);
-  // tone(SPEAKER_PIN, NOTE_G5);
-  // delay(150);
-  // noTone(SPEAKER_PIN);  
-  if (millis() - timer >= LEVEL_UP_DELAY) {
-        timer = millis();
-        switch(sequenceIndex) {
-            case 0: tone(SPEAKER_PIN, NOTE_E4); break;
-            case 1: tone(SPEAKER_PIN, NOTE_G4); break;
-            case 2: tone(SPEAKER_PIN, NOTE_E5); break;
-            case 3: tone(SPEAKER_PIN, NOTE_C5); break;
-            case 4: tone(SPEAKER_PIN, NOTE_D5); break;
-            case 5: tone(SPEAKER_PIN, NOTE_G5); break;
-            default: noTone(SPEAKER_PIN); gameState = PLAYING_SEQUENCE; sequenceIndex = 0; return;
-        }
-        sequenceIndex++;
-  }
+  tone(SPEAKER_PIN, NOTE_E4);
+  delay(150);
+  tone(SPEAKER_PIN, NOTE_G4);
+  delay(150);
+  tone(SPEAKER_PIN, NOTE_E5);
+  delay(150);
+  tone(SPEAKER_PIN, NOTE_C5);
+  delay(150);
+  tone(SPEAKER_PIN, NOTE_D5);
+  delay(150);
+  tone(SPEAKER_PIN, NOTE_G5);
+  delay(150);
+  noTone(SPEAKER_PIN);  
+  // if (millis() - timer >= LEVEL_UP_DELAY) {
+  //       timer = millis();
+  //       switch(sequenceIndex) {
+  //           case 0: tone(SPEAKER_PIN, NOTE_E4); break;
+  //           case 1: tone(SPEAKER_PIN, NOTE_G4); break;
+  //           case 2: tone(SPEAKER_PIN, NOTE_E5); break;
+  //           case 3: tone(SPEAKER_PIN, NOTE_C5); break;
+  //           case 4: tone(SPEAKER_PIN, NOTE_D5); break;
+  //           case 5: tone(SPEAKER_PIN, NOTE_G5); break;
+  //           default: noTone(SPEAKER_PIN); gameState = PLAYING_SEQUENCE; sequenceIndex = 0; return;
+  //       }
+  //       sequenceIndex++;
+  // }
 }
 
 /**
@@ -316,20 +511,23 @@ void loop() {
   // }
 
   switch (gameState) {
-    case GAME_START:
-      // gameSequence[gameIndex] = random(0, 4);
-      // gameIndex++;
-      // if (gameIndex >= MAX_GAME_LENGTH) {
-      //   gameIndex = MAX_GAME_LENGTH - 1;
-      // }
-      // gameState = PLAYING_SEQUENCE;
-      // timer = millis(); // Initialize timer
-      // sequenceIndex = 0;
-      // break;
+    case GAME_START: {
       gameIndex = 0; // Reset game index at the start of a new game
       gameState = NEW_LEVEL;
+      Serial.println("gameState: GAME_START to NEW_LEVEL ");
+
+      lightAndToneState = LIGHT_AND_TONE_OFF;
+      playSequenceState = PLAYING_SEQUENCE_OFF;
+      readButtonState = READ_BUTTON_OFF; 
+      gameOverSequenceState = GAME_OVER_OFF;
+
+      expectedButton = 255; // Initialize to no button pressed
+      actualButton = 255; // Initialize to no button pressed
+
+      checkIndex = 0;
       break;
-    case NEW_LEVEL: // Add to sequence here
+    }
+    case NEW_LEVEL: {
       if (gameIndex < MAX_GAME_LENGTH) {
         gameSequence[gameIndex] = random(0, 4);
         gameIndex++;
@@ -339,45 +537,81 @@ void loop() {
         break;
       }
       gameState = PLAYING_SEQUENCE;
+      Serial.println("gameState: NEW_LEVEL to PLAYING_SEQUENCE ");
       timer = millis();
       sequenceIndex = 0;
-      break;
+      checkIndex = 0;
 
-    case PLAYING_SEQUENCE:
+      readButtonState = READ_BUTTON_OFF;
+      break;
+    }
+    case PLAYING_SEQUENCE: {
       playSequence();
       break;
+    }
 
-    case WAITING_FOR_INPUT:
-      // inputTimer = millis();
-      // if (!checkUserSequence()) {
-      //   gameState = GAME_OVER;
-      // } else if (inputIndex >= gameIndex) {
-      //   gameState = LEVEL_UP;
-      //   timer = millis();
-      //   sequenceIndex = 0;
-      // }
-      // break;
-      if (inputIndex == 0) { // Only reset timer at the beginning of input
-        inputTimer = millis();
-      }
-      if (!checkUserSequence()) {
-          gameState = GAME_OVER;
-      } else if (inputIndex >= gameIndex) {
-          gameState = LEVEL_UP;
-          timer = millis();
-          sequenceIndex = 0;
+    case WAITING_FOR_INPUT: {
+      Serial.println("WAITING_FOR_INPUT: before readButtons ");
+          
+      readButtons();
+      Serial.println("WAITING_FOR_INPUT: after readButtons ");
+      if (readButtonState == READ_BUTTON_DONE) {
+        currentButton = actualButton;
+        Serial.println("current button is");
+        Serial.println(currentButton);
+        readButtonState = READ_BUTTON_OFF;
+        gameState = CHECKING_INPUT;
+        Serial.println("gameState: WAITING_FOR_INPUT to CHECKING_INPUT ");
       }
       break;
+    }
 
-    case GAME_OVER:
+    case CHECKING_INPUT: {
+      expectedButton = gameSequence[checkIndex];
+      if (expectedButton != currentButton) {
+        gameState = GAME_OVER;
+        Serial.println("gameState: CHECKING_INPUT to GAME_OVER ");
+      } else {
+        singleButtonPlayState = BUTTON_PLAYING_OFF;
+        gameState = PLAYING_INPUT;
+        Serial.println("gameState: CHECKING_INPUT to PLAYING_INPUT ");
+      }
+      break;
+    }
+
+    case PLAYING_INPUT: {
+      Serial.println("PLAYING INPUT: Prior to playCurrentNoteAndLed ");
+      playCurrentNoteAndLed();
+      Serial.println("PLAYING INPUT: after playCurrentNoteAndLed ");
+      break;
+    }
+
+    case GAME_OVER: {
       gameOver();
       break;
+    }
       
-    case LEVEL_UP:
-        playLevelUpSound();
-        if (sequenceIndex >= 6) { //After level up sound is complete
-          gameState = NEW_LEVEL; // Go to the next level
-        }
-        break;
+    case IS_THERE_MORE: {
+      checkIndex++; 
+      if (checkIndex < gameIndex) {
+        gameState = WAITING_FOR_INPUT;
+        Serial.println("gameState: IS_THERE_MORE to WAITING_FOR_INPUT ");
+      } else {
+        gameState = LEVEL_UP;
+        Serial.println("gameState: IS_THERE_MORE to LEVEL_UP ");
+      }
+      break;
+    }
+
+    case LEVEL_UP: {
+      playLevelUpSound();
+      // gameState = LEVEL_UP_SEQUENCE;
+      // if (sequenceIndex >= 6) { //After level up sound is complete
+      //   gameState = NEW_LEVEL; // Go to the next level
+      // }
+      gameState = NEW_LEVEL;
+      Serial.println("gameState: LEVEL_UP to NEW_LEVEL ");
+      break;
+    }
   }
 }
