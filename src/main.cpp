@@ -28,8 +28,8 @@ byte segmentPins[] = {6, 7, 30, 9, 10, 11, 12, 13}; //changed 8 to 30
 bool resistorsOnSegments = 0; 
 // // variable above indicates that 4 resistors were placed on the digit pins.
 // // set variable to 1 if you want to use 8 resistors on the segment pins.
-byte hardwareConfig = COMMON_ANODE; // See README.md for options
-// byte hardwareConfig = COMMON_CATHODE; // See README.md for options
+// byte hardwareConfig = COMMON_ANODE; // Uncomment for Simulator to work -See README.md for options
+byte hardwareConfig = COMMON_CATHODE; // Uncomment for Real Hardware to work -See README.md for options
 bool updateWithDelays = false; // Default 'false' is Recommended
 bool leadingZeros = false; // Use 'true' if you'd like to keep the leading zeros
 bool disableDecPoint = false; // Use 'true' if your decimal point doesn't exist or isn't connected
