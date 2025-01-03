@@ -108,6 +108,8 @@ enum GameOverSequenceState {
 GameOverSequenceState gameOverSequenceState = GAME_OVER_OFF;
 
 //APro's Constants code
+// bool debugModeOn = true; // Set to true to enable debug mode
+bool debugModeOn = false; // Set to true to enable debug mode
 unsigned long lightAndToneDuration = 300; // Timer duration in milliseconds for light and tone duration
 unsigned long playSequenceWaitDuration = 50; // Timer duration in milliseconds to wait between light/tone steps
 unsigned long playSequenceTimer = 0; // Timer allocated for playSequence
@@ -227,7 +229,8 @@ void playSequence() {
   switch (playSequenceState) {
     case PLAYING_SEQUENCE_OFF:
       playSequenceState = PLAYING_SEQUENCE_ON;
-      Serial.println("playSequence-Off to On ");
+      if (debugModeOn)
+        Serial.println("playSequence-Off to On ");
       playSequenceTimer = millis();
       sequenceIndex = 0;
       break;
@@ -269,7 +272,8 @@ void playSequence() {
     case PLAYING_SEQUENCE_DONE:
       playSequenceState = PLAYING_SEQUENCE_OFF;
       gameState = WAITING_FOR_INPUT;
-      Serial.println("gameState: PLAYING_SEQUNCE to WAITING_FOR_INPUT ");
+      if (debugModeOn)
+        Serial.println("gameState: PLAYING_SEQUNCE to WAITING_FOR_INPUT ");
       break;
       
   }
@@ -282,7 +286,9 @@ void playCurrentNoteAndLed() {
   switch (singleButtonPlayState) {
     case BUTTON_PLAYING_OFF:
       singleButtonPlayState = BUTTON_PLAYING_ON;
-      Serial.println("playCurrentNoteAndLed: BUTTON_PLAYING_OFF to BUTTON_PLAYING_ON ");
+      
+      if (debugModeOn)
+        Serial.println("playCurrentNoteAndLed: BUTTON_PLAYING_OFF to BUTTON_PLAYING_ON ");
       singlePlayTimer = millis();
       break;
     case BUTTON_PLAYING_ON:
@@ -290,7 +296,9 @@ void playCurrentNoteAndLed() {
       lightLedAndPlayTone(currentButton, true);
       lightAndToneState = LIGHT_AND_TONE_WAIT;
       singleButtonPlayState = BUTTON_PLAYING_PLAY_WAIT;
-      Serial.println("playCurrentNoteAndLed: BUTTON_PLAYING_ON to BUTTON_PLAYING_PLAY_WAIT ");
+      
+      if (debugModeOn)
+        Serial.println("playCurrentNoteAndLed: BUTTON_PLAYING_ON to BUTTON_PLAYING_PLAY_WAIT ");
       break;
     case BUTTON_PLAYING_PLAY_WAIT:
       switch (lightAndToneState) {
@@ -310,7 +318,8 @@ void playCurrentNoteAndLed() {
     case BUTTON_PLAYING_DONE:
       singleButtonPlayState = BUTTON_PLAYING_OFF;
       gameState = IS_THERE_MORE;
-      Serial.println("gameState: PLAYING_INPUT to IS_THERE_MORE ");
+      if (debugModeOn)
+        Serial.println("gameState: PLAYING_INPUT to IS_THERE_MORE ");
       break;
   }
   // lightLedAndPlayTone(currentButton, true);
@@ -347,8 +356,10 @@ void readButtons() {
         if (buttonIndex != 255) {
           readButtonState = READ_BUTTON_DONE;
           actualButton = buttonIndex;
-          Serial.println("actual button is");
-          Serial.println(actualButton);
+          if (debugModeOn) {
+            Serial.println("actual button is");
+            Serial.println(actualButton);
+          }
         } else {
           readButtonState = READ_BUTTON_ON;
         }
@@ -514,7 +525,8 @@ void loop() {
     case GAME_START: {
       gameIndex = 0; // Reset game index at the start of a new game
       gameState = NEW_LEVEL;
-      Serial.println("gameState: GAME_START to NEW_LEVEL ");
+      if (debugModeOn)
+        Serial.println("gameState: GAME_START to NEW_LEVEL ");
 
       lightAndToneState = LIGHT_AND_TONE_OFF;
       playSequenceState = PLAYING_SEQUENCE_OFF;
@@ -537,7 +549,8 @@ void loop() {
         break;
       }
       gameState = PLAYING_SEQUENCE;
-      Serial.println("gameState: NEW_LEVEL to PLAYING_SEQUENCE ");
+      if (debugModeOn)
+        Serial.println("gameState: NEW_LEVEL to PLAYING_SEQUENCE ");
       timer = millis();
       sequenceIndex = 0;
       checkIndex = 0;
@@ -551,17 +564,24 @@ void loop() {
     }
 
     case WAITING_FOR_INPUT: {
-      Serial.println("WAITING_FOR_INPUT: before readButtons ");
+      if (debugModeOn)
+        Serial.println("WAITING_FOR_INPUT: before readButtons ");
           
       readButtons();
-      Serial.println("WAITING_FOR_INPUT: after readButtons ");
+      if (debugModeOn)
+        Serial.println("WAITING_FOR_INPUT: after readButtons ");
       if (readButtonState == READ_BUTTON_DONE) {
         currentButton = actualButton;
-        Serial.println("current button is");
-        Serial.println(currentButton);
+        
+        if (debugModeOn) {
+          Serial.println("WAITING_FOR_INPUT: currentButton is ");
+          Serial.println(currentButton);
+        }
         readButtonState = READ_BUTTON_OFF;
         gameState = CHECKING_INPUT;
-        Serial.println("gameState: WAITING_FOR_INPUT to CHECKING_INPUT ");
+        
+        if (debugModeOn)
+          Serial.println("gameState: WAITING_FOR_INPUT to CHECKING_INPUT ");
       }
       break;
     }
@@ -574,15 +594,19 @@ void loop() {
       } else {
         singleButtonPlayState = BUTTON_PLAYING_OFF;
         gameState = PLAYING_INPUT;
-        Serial.println("gameState: CHECKING_INPUT to PLAYING_INPUT ");
+        if (debugModeOn)
+          Serial.println("gameState: CHECKING_INPUT to PLAYING_INPUT ");
       }
       break;
     }
 
     case PLAYING_INPUT: {
-      Serial.println("PLAYING INPUT: Prior to playCurrentNoteAndLed ");
+      if (debugModeOn)
+        Serial.println("PLAYING INPUT: Prior to playCurrentNoteAndLed ");
       playCurrentNoteAndLed();
-      Serial.println("PLAYING INPUT: after playCurrentNoteAndLed ");
+      
+      if (debugModeOn)
+        Serial.println("PLAYING INPUT: after playCurrentNoteAndLed ");
       break;
     }
 
@@ -595,10 +619,14 @@ void loop() {
       checkIndex++; 
       if (checkIndex < gameIndex) {
         gameState = WAITING_FOR_INPUT;
-        Serial.println("gameState: IS_THERE_MORE to WAITING_FOR_INPUT ");
+        
+        if (debugModeOn)
+          Serial.println("gameState: IS_THERE_MORE to WAITING_FOR_INPUT ");
       } else {
         gameState = LEVEL_UP;
-        Serial.println("gameState: IS_THERE_MORE to LEVEL_UP ");
+        
+        if (debugModeOn)
+          Serial.println("gameState: IS_THERE_MORE to LEVEL_UP ");
       }
       break;
     }
@@ -610,7 +638,9 @@ void loop() {
       //   gameState = NEW_LEVEL; // Go to the next level
       // }
       gameState = NEW_LEVEL;
-      Serial.println("gameState: LEVEL_UP to NEW_LEVEL ");
+
+      if (debugModeOn)
+        Serial.println("gameState: LEVEL_UP to NEW_LEVEL ");
       break;
     }
   }
