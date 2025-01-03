@@ -21,13 +21,18 @@ const int LATCH_PIN = A1;  // 74HC595 pin 12
 const int DATA_PIN = A0;  // 74HC595pin 14
 const int CLOCK_PIN = A2;  // 74HC595 pin 11
 
-// SevSeg sevseg; //Initiate a seven segment controller object
-// byte numDigits = 4;  
-// byte digitPins[] = {2, 3, 4, 5};
-// byte segmentPins[] = {6, 7, 30, 9, 10, 11, 12, 13}; //changed 8 to 30
-// bool resistorsOnSegments = 0; 
+SevSeg sevseg; //Initiate a seven segment controller object
+byte numDigits = 4;  
+byte digitPins[] = {2, 3, 4, 5};
+byte segmentPins[] = {6, 7, 30, 9, 10, 11, 12, 13}; //changed 8 to 30
+bool resistorsOnSegments = 0; 
 // // variable above indicates that 4 resistors were placed on the digit pins.
 // // set variable to 1 if you want to use 8 resistors on the segment pins.
+byte hardwareConfig = COMMON_ANODE; // See README.md for options
+// byte hardwareConfig = COMMON_CATHODE; // See README.md for options
+bool updateWithDelays = false; // Default 'false' is Recommended
+bool leadingZeros = false; // Use 'true' if you'd like to keep the leading zeros
+bool disableDecPoint = false; // Use 'true' if your decimal point doesn't exist or isn't connected
 
 #define MAX_GAME_LENGTH 100
 
@@ -158,7 +163,9 @@ void setup() {
   pinMode(DATA_PIN, OUTPUT);
   
   // sevseg.begin(COMMON_CATHODE, numDigits, digitPins, segmentPins, resistorsOnSegments);
-  // sevseg.setBrightness(90);
+  sevseg.begin(hardwareConfig, numDigits, digitPins, segmentPins, resistorsOnSegments,
+  updateWithDelays, leadingZeros, disableDecPoint);
+  sevseg.setBrightness(90);
 
   // The following line primes the random number generator.
   // It assumes pin A3 is floating (disconnected):
@@ -191,9 +198,12 @@ void sendScore(uint8_t high, uint8_t low) {
 }
 
 void displayScore() {
-  int high = gameIndex % 100 / 10;
-  int low = gameIndex % 10;
-  sendScore(high ? digitTable[high] : 0xff, digitTable[low]);
+  // int high = gameIndex % 100 / 10;
+  // int low = gameIndex % 10;
+  // sendScore(high ? digitTable[high] : 0xff, digitTable[low]);
+  sevseg.setNumber(gameIndex);
+  // sevseg.setNumber(3145,3);
+  sevseg.refreshDisplay();
 }
 
 /**

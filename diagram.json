@@ -73,6 +73,38 @@
       "top": -151.2,
       "left": 193.8,
       "attrs": { "volume": "0.1" }
+    },
+    {
+      "type": "wokwi-resistor",
+      "id": "r1",
+      "top": -148.8,
+      "left": -86.95,
+      "rotate": 90,
+      "attrs": { "value": "330" }
+    },
+    {
+      "type": "wokwi-resistor",
+      "id": "r2",
+      "top": -148.8,
+      "left": -288.55,
+      "rotate": 90,
+      "attrs": { "value": "330" }
+    },
+    {
+      "type": "wokwi-resistor",
+      "id": "r3",
+      "top": -148.8,
+      "left": -269.35,
+      "rotate": 90,
+      "attrs": { "value": "330" }
+    },
+    {
+      "type": "wokwi-resistor",
+      "id": "r4",
+      "top": -148.8,
+      "left": -192.55,
+      "rotate": 90,
+      "attrs": { "value": "330" }
     }
   ],
   "connections": [
@@ -93,7 +125,23 @@
     [ "btn1:2.r", "mega:35", "red", [ "h9.8", "v-67", "h336", "v296.4" ] ],
     [ "led1:A", "mega:43", "red", [ "v0" ] ],
     [ "btn2:2.r", "mega:37", "green", [ "v19.4", "h336.2", "v123.5" ] ],
-    [ "led2:A", "mega:45", "green", [ "v0" ] ]
+    [ "led2:A", "mega:45", "green", [ "v0" ] ],
+    [ "sevseg1:A", "mega:6", "#8f4814", [ "v-48", "h-182.4", "v403.2", "h532.4" ] ],
+    [ "sevseg1:B", "mega:7", "red", [ "v-57.6", "h-249.6", "v393.6", "h551.2" ] ],
+    [ "sevseg1:C", "mega:30", "orange", [ "v0" ] ],
+    [ "sevseg1:D", "mega:9", "gold", [ "v258.36", "h317.5" ] ],
+    [ "sevseg1:E", "mega:10", "blue", [ "v248.76", "h317.11" ] ],
+    [ "sevseg1:F", "mega:11", "violet", [ "v-67.2", "h288", "v364.8" ] ],
+    [ "sevseg1:G", "mega:12", "gray", [ "v239.16", "h259.2" ] ],
+    [ "sevseg1:DP", "mega:13", "white", [ "v219.96", "h269.4" ] ],
+    [ "r4:1", "sevseg1:DIG1", "green", [ "v-124.8", "h57.59" ] ],
+    [ "r4:2", "mega:2", "green", [ "v229.2", "h455.2" ] ],
+    [ "r3:1", "sevseg1:DIG2", "blue", [ "v-134.4", "h163.2" ] ],
+    [ "r3:2", "mega:3", "blue", [ "v219.6", "h522.5" ] ],
+    [ "r2:1", "sevseg1:DIG3", "violet", [ "v-144", "h192" ] ],
+    [ "r2:2", "mega:4", "violet", [ "v210", "h532.2" ] ],
+    [ "r1:1", "sevseg1:DIG4", "cyan", [ "h0" ] ],
+    [ "r1:2", "mega:5", "cyan", [ "v200.4", "h321.1" ] ]
   ],
   "dependencies": {}
 }
